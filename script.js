@@ -1,16 +1,17 @@
 // Global configuration. All sizes are in px, Times in ms
 var cfg = {
-    interval: 100,
+    interval: 100,                          // Framerate 
     particle_life: 6000,
     particle_life_variation: 1000,
-    particle_limit: 100,
-    particle_size: 2,
-    particle_size_variation: 1,
-    particle_speed: 100,
-    bg_color: "#000",
+    particle_limit: 100,                    // How many particles can exist at one time
+    particle_size: 2,                       // base H and W of a particle
+    particle_size_variation: 1,             // How much H and W of a particle can vary from particle_size
+    particle_speed: 60,                     // How many pixels / sec a particle can translate
+    bg_color: "#13001C",
     particle_color_start: "rgba(255, 255, 0, 1)",
     particle_color_mid: "rgba(255, 174, 0, 0.7)",
     particle_color_end: "rgba(255, 174, 0, 0.3)",
+    shadow_blur: 20,
     canvas_width: 640,
     canvas_height: 480,
     particle_origin_x: this.canvas_width / 2,
@@ -74,16 +75,15 @@ class ParticleSystem {
         // draw background
         this.ctx.fillStyle = this.cfg.bg_color;
         this.ctx.fillRect(0, 0, this.cfg.canvas_width, this.cfg.canvas_height);
-    
-        
-        this.ctx.shadowBlur = 10;
+         
+        this.ctx.shadowBlur = this.cfg.shadow_blur;
         this.particles.forEach((v, idx, arr) => {
+            // spark color fades as it approaches the end of it's life
             if (v.life < v.max_life * 2/3) {
                 this.ctx.fillStyle = this.cfg.particle_color_mid;
                 this.ctx.shadowColor = this.cfg.particle_color_mid;
             }
             else if(v.life < v.max_life * 1/3) {
-                console.log("midlife");
                 this.ctx.fillStyle = this.cfg.particle_color_end;
                 this.ctx.shadowColor = this.cfg.particle_color_end;
             }
@@ -101,11 +101,11 @@ class ParticleSystem {
             
             if (v.life > 0) {
                 // update coordinates
-                v.direction_x = v.direction_x * ((v.x > this.canvas.width || v.x < 0) ? -1 : 1);      
+                v.direction_x = v.direction_x * ((v.x > this.canvas.width || v.x < 0) ? -1 : 1); 
                 v.direction_y = v.direction_y * ((v.y > this.canvas.height || v.y < 0) ? -1 : 1);
         
-                v.x = v.x + (v.direction_x * this.cfg.particle_speed * (deltaT/1000));   
-                v.y = v.y + (v.direction_y * this.cfg.particle_speed * (deltaT/1000));
+                v.x = v.x + (v.direction_x * this.cfg.particle_speed * (deltaT/1000));
+                v.y = v.y + (v.direction_y * this.cfg.particle_speed * 2 * (deltaT/1000));
 
                 v.life -= deltaT;
             }
@@ -119,7 +119,9 @@ class ParticleSystem {
     addParticle() {
         if (this.particles.length < this.cfg.particle_limit) {
             var rect_x = Math.floor(Math.random() * this.cfg.canvas_width);
-            var rect_y = Math.floor(Math.random() * this.cfg.canvas_height);
+
+            // spawn from the bottom of the canvas
+            var rect_y = Math.floor((Math.random() * (this.cfg.canvas_height / 5)) + (this.cfg.canvas_height * 4/5));
             var max_life = this.cfg.particle_life + this.getVariation(this.cfg.particle_life_variation);
             var particle_size = this.cfg.particle_size + this.getVariation(this.cfg.particle_size_variation);
             this.particles.push({
@@ -130,10 +132,9 @@ class ParticleSystem {
                 h: particle_size,
                 life: max_life,
                 max_life: max_life,
-                direction_x: 1,
-                direction_y: 1
+                direction_x: this.getVariation(1),
+                direction_y: -1
             });
-
             this.id++;
         }
     }
@@ -141,6 +142,7 @@ class ParticleSystem {
     updateScene() {
         this.drawParticles();
     }
+
     // gets a random -/+ value within n distance of 0
     getVariation(n) {
         return Math.floor(n * (Math.random() > 0.5 ? -1 : 1));

@@ -2,26 +2,31 @@
 var cfg = {
     interval: 100,
     particle_life: 6000,
+    particle_life_variation: 1000,
+    particle_limit: 100,
     particle_size: 2,
+    particle_size_variation: 1,
     particle_speed: 100,
     bg_color: "#000",
-    particle_color:"#FFAE00",
+    particle_color_start: "rgba(255, 255, 0, 1)",
+    particle_color_mid: "rgba(255, 174, 0, 0.7)",
+    particle_color_end: "rgba(255, 174, 0, 0.3)",
     canvas_width: 640,
     canvas_height: 480,
-    sphere_color: "orange",
-    sphere_origin_x: this.canvas_width / 2,
-    sphere_origin_y: this.canvas_height / 2,
-    
     particle_origin_x: this.canvas_width / 2,
     particle_origin_y: this.canvas_height / 2,  
+    // controls
+    stopAnimation: "stop",
+    stopSpawner: "stopSpawn"
 };
 
 // Let's classify this business
 class ParticleSystem {
-    
     constructor(canvasId, cfg) {
+        this.id = 0;
         // Setup
         this.particles = [];
+        this.lastFrameTime = null;
         this.cfg = cfg;
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext("2d");
@@ -32,12 +37,13 @@ class ParticleSystem {
 
         // Animation Loop
         this.loop = setInterval(() => {
-            this.drawParticles();
+            this.updateScene();
         }, this.cfg.interval);
 
-        var stopMe = document.getElementById("stop");
+        var stopMe = document.getElementById(this.cfg.stopAnimation);
         stopMe.addEventListener("click", () => {
             clearInterval(this.loop);
+            clearInterval(this.spawner);            
         });
 
         // Spawner Loop
@@ -45,13 +51,23 @@ class ParticleSystem {
             this.addParticle();    
         }, this.cfg.interval);
 
-        var stopSpawn = document.getElementById("stopSpawn");
+        var stopSpawn = document.getElementById(this.cfg.stopSpawner);
         stopSpawn.addEventListener('click', () => {
             clearInterval(this.spawner);
         });
     }
 
     drawParticles() {
+        var deltaT;
+        var now = +new Date();
+        if (this.lastFrameTime === null) {
+            deltaT = this.interval;
+        } 
+        else {
+            deltaT = now - this.lastFrameTime;
+        }
+        this.lastFrameTime = now;
+
         // clear canvas
         this.ctx.clearRect(0, 0, this.cfg.canvas_width, this.cfg.canvas_height);
     
@@ -59,31 +75,75 @@ class ParticleSystem {
         this.ctx.fillStyle = this.cfg.bg_color;
         this.ctx.fillRect(0, 0, this.cfg.canvas_width, this.cfg.canvas_height);
     
-        this.ctx.fillStyle = this.cfg.particle_color;
-        this.ctx.shadowColor = this.cfg.particle_color;
+        
         this.ctx.shadowBlur = 10;
-        this.particles.forEach((v) => {
-    
+        this.particles.forEach((v, idx, arr) => {
+            if (v.life < v.max_life * 2/3) {
+                this.ctx.fillStyle = this.cfg.particle_color_mid;
+                this.ctx.shadowColor = this.cfg.particle_color_mid;
+            }
+            else if(v.life < v.max_life * 1/3) {
+                console.log("midlife");
+                this.ctx.fillStyle = this.cfg.particle_color_end;
+                this.ctx.shadowColor = this.cfg.particle_color_end;
+            }
+            else {
+                this.ctx.fillStyle = this.cfg.particle_color_start;
+                this.ctx.shadowColor = this.cfg.particle_color_start;
+            }
+
             this.ctx.fillRect(
                 v.x,
                 v.y,
-                this.cfg.particle_size,
-                this.cfg.particle_size
+                v.w,
+                v.h
             );  
             
-            // update coordinates
-            v.direction_x = v.direction_x * ((v.x > this.canvas.width || v.x < 0) ? -1 : 1);      
-            v.direction_y = v.direction_y * ((v.y > this.canvas.height || v.y < 0) ? -1 : 1);
-    
-            v.x = v.x + (v.direction_x * this.cfg.particle_speed * (this.cfg.interval/1000));   
-            v.y = v.y + (v.direction_y * this.cfg.particle_speed * (this.cfg.interval/1000));
+            if (v.life > 0) {
+                // update coordinates
+                v.direction_x = v.direction_x * ((v.x > this.canvas.width || v.x < 0) ? -1 : 1);      
+                v.direction_y = v.direction_y * ((v.y > this.canvas.height || v.y < 0) ? -1 : 1);
+        
+                v.x = v.x + (v.direction_x * this.cfg.particle_speed * (deltaT/1000));   
+                v.y = v.y + (v.direction_y * this.cfg.particle_speed * (deltaT/1000));
+
+                v.life -= deltaT;
+            }
+            else {
+                // remove particle from particles array if life has expired
+                arr.splice(idx, 1);
+            }
         });
     }
 
     addParticle() {
-        var rect_x = Math.floor(Math.random() * this.cfg.canvas_width);
-        var rect_y = Math.floor(Math.random() * this.cfg.canvas_height);
-        this.particles.push({x: rect_x, y: rect_y, life: this.cfg.particle_life, direction_x: 1, direction_y: 1});
+        if (this.particles.length < this.cfg.particle_limit) {
+            var rect_x = Math.floor(Math.random() * this.cfg.canvas_width);
+            var rect_y = Math.floor(Math.random() * this.cfg.canvas_height);
+            var max_life = this.cfg.particle_life + this.getVariation(this.cfg.particle_life_variation);
+            var particle_size = this.cfg.particle_size + this.getVariation(this.cfg.particle_size_variation);
+            this.particles.push({
+                id: this.id,
+                x: rect_x,
+                y: rect_y,
+                w: particle_size,
+                h: particle_size,
+                life: max_life,
+                max_life: max_life,
+                direction_x: 1,
+                direction_y: 1
+            });
+
+            this.id++;
+        }
+    }
+
+    updateScene() {
+        this.drawParticles();
+    }
+    // gets a random -/+ value within n distance of 0
+    getVariation(n) {
+        return Math.floor(n * (Math.random() > 0.5 ? -1 : 1));
     }
 }
 

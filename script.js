@@ -1,13 +1,12 @@
 // Global configuration. All sizes are in px, Times in ms
 var cfg = {
-    interval: 100,                          // Framerate 
+    interval: 16,                          // Framerate 
     particle_life: 6000,
     particle_life_variation: 1000,
     particle_limit: 100,                    // How many particles can exist at one time
     particle_size: 2,                       // base H and W of a particle
     particle_size_variation: 1,             // How much H and W of a particle can vary from particle_size
-    particle_speed: 60,                     // How many pixels / sec a particle can translate
-    bg_color: "#13001C",
+    particle_speed: 40,                     // How many pixels / sec a particle can translate
     particle_color_start: "rgba(255, 255, 0, 1)",
     particle_color_mid: "rgba(255, 174, 0, 0.7)",
     particle_color_end: "rgba(255, 174, 0, 0.3)",
@@ -21,7 +20,6 @@ var cfg = {
     stopSpawner: "stopSpawn"
 };
 
-// Let's classify this business
 class ParticleSystem {
     constructor(canvasId, cfg) {
         this.id = 0;
@@ -33,15 +31,13 @@ class ParticleSystem {
         this.ctx = this.canvas.getContext("2d");
         this.canvas.width = this.cfg.canvas_width;
         this.canvas.height = this.cfg.canvas_height;
-        this.ctx.fillStyle = this.cfg.bg_color;
-        this.ctx.fillRect(0, 0, this.cfg.canvas_width, this.cfg.canvas_height);
 
         // Animation Loop
         this.loop = setInterval(() => {
             this.updateScene();
         }, this.cfg.interval);
 
-        var stopMe = document.getElementById(this.cfg.stopAnimation);
+        const stopMe = document.getElementById(this.cfg.stopAnimation);
         stopMe.addEventListener("click", () => {
             clearInterval(this.loop);
             clearInterval(this.spawner);            
@@ -52,15 +48,15 @@ class ParticleSystem {
             this.addParticle();    
         }, this.cfg.interval);
 
-        var stopSpawn = document.getElementById(this.cfg.stopSpawner);
+        const stopSpawn = document.getElementById(this.cfg.stopSpawner);
         stopSpawn.addEventListener('click', () => {
             clearInterval(this.spawner);
         });
     }
 
     drawParticles() {
-        var deltaT;
-        var now = +new Date();
+        let deltaT;
+        let now = +new Date();
         if (this.lastFrameTime === null) {
             deltaT = this.interval;
         } 
@@ -71,11 +67,6 @@ class ParticleSystem {
 
         // clear canvas
         this.ctx.clearRect(0, 0, this.cfg.canvas_width, this.cfg.canvas_height);
-    
-        // draw background
-        this.ctx.fillStyle = this.cfg.bg_color;
-        this.ctx.fillRect(0, 0, this.cfg.canvas_width, this.cfg.canvas_height);
-         
         this.ctx.shadowBlur = this.cfg.shadow_blur;
         this.particles.forEach((v, idx, arr) => {
             // spark color fades as it approaches the end of it's life
@@ -97,15 +88,20 @@ class ParticleSystem {
                 v.y,
                 v.w,
                 v.h
-            );  
+            );
             
             if (v.life > 0) {
                 // update coordinates
                 v.direction_x = v.direction_x * ((v.x > this.canvas.width || v.x < 0) ? -1 : 1); 
                 v.direction_y = v.direction_y * ((v.y > this.canvas.height || v.y < 0) ? -1 : 1);
         
-                v.x = v.x + (v.direction_x * this.cfg.particle_speed * (deltaT/1000));
-                v.y = v.y + (v.direction_y * this.cfg.particle_speed * 2 * (deltaT/1000));
+                // Math.cos adds a little bit of randomness to movement in the x direction
+                v.x = v.x + (v.direction_x * this.cfg.particle_speed * (deltaT/1000)) + (Math.cos((v.y + this.getVariation(2)) * (Math.PI/180)));
+
+                v.y = v.y + (v.direction_y * this.cfg.particle_speed * 1.5 * (deltaT/1000));
+                
+                // convection current in the middle of the canvas
+                v.y = v.y -  (v.x > ((this.cfg.canvas_width/2) - 100) &&  v.x < ((this.cfg.canvas_width/2) + 100) ? 2 : 0);
 
                 v.life -= deltaT;
             }
@@ -119,7 +115,6 @@ class ParticleSystem {
     addParticle() {
         if (this.particles.length < this.cfg.particle_limit) {
             var rect_x = Math.floor(Math.random() * this.cfg.canvas_width);
-
             // spawn from the bottom of the canvas
             var rect_y = Math.floor((Math.random() * (this.cfg.canvas_height / 5)) + (this.cfg.canvas_height * 4/5));
             var max_life = this.cfg.particle_life + this.getVariation(this.cfg.particle_life_variation);
